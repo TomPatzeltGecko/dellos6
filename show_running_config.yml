@@ -6,6 +6,8 @@
   vars:
     ansible_become: true
     ansible_become_method: enable
+    ansible_become_password: "{{ ansible_password }}"
+    ansible_command_timeout: 120
 
   tasks:
     - name: Running Config auslesen
