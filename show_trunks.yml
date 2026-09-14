@@ -1,0 +1,46 @@
+---
+- name: Dell Trunk-Uebersicht
+  hosts: dell_switches
+  gather_facts: false
+
+  vars:
+    ansible_become: true
+    ansible_become_method: enable
+    ansible_command_timeout: 120
+
+  tasks:
+    - name: Trunk-Informationen auslesen
+      dellemc.os6.os6_command:
+        commands:
+          - show interfaces trunk
+      register: result
+
+    - name: Trunk-Zeilen ermitteln
+      ansible.builtin.set_fact:
+        trunk_lines: >-
+          {{
+            result.stdout_lines[0]
+            | select('match', '^(Gi|Te|Fo|Po)')
+            | list
+          }}
+
+    - name: Header anzeigen
+      ansible.builtin.debug:
+        msg:
+          - "===================================="
+          - "Switch: {{ inventory_hostname }}"
+          - "IP: {{ ansible_host | default(inventory_hostname) }}"
+          - "Aktive Trunks: {{ trunk_lines | length }}"
+          - "===================================="
+
+    - name: Aktive Trunks anzeigen
+      ansible.builtin.debug:
+        msg: "{{ item }}"
+      loop: "{{ trunk_lines }}"
+      loop_control:
+        label: "{{ item.split()[0] }}"
+
+    - name: Hinweis anzeigen, wenn keine aktiven Trunks gefunden wurden
+      ansible.builtin.debug:
+        msg: "Auf {{ inventory_hostname }} wurden keine aktiven Trunk- oder General-Ports gefunden."
+      when: trunk_lines | length == 0
