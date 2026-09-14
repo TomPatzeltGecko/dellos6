@@ -1,17 +1,38 @@
 ---
-- name: Dell Image Versionen
+- name: Dell Image-Versionen anzeigen
   hosts: dell_switches
   gather_facts: false
 
   tasks:
-    - name: Show Version
+    - name: Show Version ausführen
       dellemc.os6.os6_command:
         commands:
           - show version
       register: result
 
-    - name: Stack Images anzeigen
+    - name: Firmware-Zeilen ermitteln
+      ansible.builtin.set_fact:
+        firmware_rows: >-
+          {{
+            result.stdout[0].splitlines()
+            | select('match', '^\s*[0-9]+\s+\S+\s+\S+\s+\S+\s+\S+\s*$')
+            | list
+          }}
+
+    - name: Active und Backup Image je Unit anzeigen
       ansible.builtin.debug:
-        msg: "{{ inventory_hostname }} -> {{ item }}"
-      loop: "{{ result.stdout[0].split('\n') }}"
-      when: item is match('^[0-9]+\\s+')
+        msg:
+          - "Switch: {{ inventory_hostname }}"
+          - "Unit: {{ item.split()[0] }}"
+          - "Active Image: {{ item.split()[1] }}"
+          - "Backup Image: {{ item.split()[2] }}"
+          - "Aktuell gestartet: {{ item.split()[3] }}"
+          - "Nach Neustart: {{ item.split()[4] }}"
+      loop: "{{ firmware_rows }}"
+      loop_control:
+        label: "Unit {{ item.split()[0] }}"
+
+    - name: Hinweis bei nicht erkannter Firmware-Tabelle
+      ansible.builtin.debug:
+        msg: "Auf {{ inventory_hostname }} wurde keine passende Firmware-Tabelle gefunden."
+      when: firmware_rows | length == 0
