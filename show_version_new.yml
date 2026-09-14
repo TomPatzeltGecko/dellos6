@@ -10,12 +10,13 @@
           - show version
       register: result
 
-    - name: Ausgabe
+    - name: Zeilen mit Software-Versionen anzeigen
       ansible.builtin.debug:
-        msg: "{{ inventory_hostname }} -> {{ item }}"
+        msg: "{{ item }}"
       loop: >-
         {{
           result.stdout[0].split('\n')
           | select('match', '^[0-9]+\\s+')
           | list
         }}
+``
