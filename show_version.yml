@@ -1,11 +1,11 @@
 ---
-- name: Show Version
-  hosts: cisco_switches
+- name: Dell Test
+  hosts: dell_switches
   gather_facts: false
 
   tasks:
     - name: Show Version
-      cisco.ios.ios_command:
+      dellemc.os6.os6_command:
         commands:
           - show version
       register: result
