@@ -1,5 +1,5 @@
 ---
-- name: Dell VLAN Übersicht
+- name: Dell VLAN Debug
   hosts: dell_switches
   gather_facts: false
 
@@ -14,12 +14,6 @@
           - show vlan
       register: result
 
-    - name: VLAN Übersicht
-      ansible.builtin.debug:
-        msg: "{{ inventory_hostname }} -> {{ item }}"
-      loop: >-
-        {{
-          result.stdout[0].splitlines()
-          | select('match', '^\\s*[0-9]+\\s+')
-          | list
-        }}
+    - name: Rohdaten anzeigen
+      debug:
+        var: result.stdout_lines[0]
