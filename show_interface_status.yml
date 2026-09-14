@@ -1,15 +1,18 @@
 ---
-- name: Show Interface Status
+- name: Dell Interface-Status anzeigen
   hosts: dell_switches
   gather_facts: false
 
   tasks:
-    - name: Show Interface Status
-      cisco.ios.ios_command:
+    - name: Interface-Status auslesen
+      dellemc.os6.os6_command:
         commands:
           - show interfaces status
       register: result
 
-    - name: Ausgabe
-      debug:
-        var: result.stdout_lines
+    - name: Interface-Status ausgeben
+      ansible.builtin.debug:
+        msg:
+          - "Switch: {{ inventory_hostname }}"
+          - "IP-Adresse: {{ ansible_host | default(inventory_hostname) }}"
+          - "{{ result.stdout[0] }}"
