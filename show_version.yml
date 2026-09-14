@@ -1,0 +1,14 @@
+---
+- name: Dell Test
+  hosts: dell_switches
+  gather_facts: false
+
+  tasks:
+    - name: Show Version
+      dellemc.os6.os6_command:
+        commands:
+          - show version
+      register: result
+
+    - debug:
+        var: result.stdout_lines
