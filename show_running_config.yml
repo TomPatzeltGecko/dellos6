@@ -20,4 +20,3 @@
           - "Switch: {{ inventory_hostname }}"
           - "IP-Adresse: {{ ansible_host | default(inventory_hostname) }}"
           - "{{ result.stdout[0] }}"
-`
