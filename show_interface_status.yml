@@ -1,6 +1,6 @@
 ---
 - name: Show Interface Status
-  hosts: cisco_switches
+  hosts: dell_switches
   gather_facts: false
 
   tasks:
