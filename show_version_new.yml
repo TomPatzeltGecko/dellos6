@@ -10,19 +10,12 @@
           - show version
       register: result
 
-    - name: Versionszeile auslesen
-      ansible.builtin.set_fact:
-        image_versions: >-
-          {{
-            (
-              result.stdout[0]
-              | regex_search('(?m)^1\s+\S+\s+\S+')
-            ).split()
-          }}
-
-    - name: Active und Backup Image anzeigen
+    - name: Ausgabe
       ansible.builtin.debug:
-        msg:
-          - "Switch: {{ inventory_hostname }}"
-          - "Active Image: {{ image_versions[1] }}"
-          - "Backup Image: {{ image_versions[2] }}"
+        msg: "{{ inventory_hostname }} -> {{ item }}"
+      loop: >-
+        {{
+          result.stdout[0].split('\n')
+          | select('match', '^[0-9]+\\s+')
+          | list
+        }}
