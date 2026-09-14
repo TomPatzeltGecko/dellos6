@@ -15,9 +15,21 @@
           - show running-config
       register: result
 
-    - name: Running Config ausgeben
+    - name: Sensible Konfigurationszeilen ausblenden
+      ansible.builtin.set_fact:
+        sanitized_config: >-
+          {{
+            result.stdout[0].splitlines()
+            | reject('match', '^\s*username\s+')
+            | reject('match', '^\s*enable password\s+')
+            | reject('match', '^\s*snmp-server community\s+')
+            | list
+          }}
+
+    - name: Bereinigte Running Config ausgeben
       ansible.builtin.debug:
         msg:
           - "Switch: {{ inventory_hostname }}"
           - "IP-Adresse: {{ ansible_host | default(inventory_hostname) }}"
-          - "{{ result.stdout[0] }}"
+          - "Hinweis: Benutzer-, Enable- und SNMP-Secrets wurden ausgeblendet."
+          - "{{ sanitized_config }}"
