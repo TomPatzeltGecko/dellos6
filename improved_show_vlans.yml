@@ -1,0 +1,100 @@
+---
+- name: Dell VLAN-Gesamtuebersicht
+  hosts: dell_switches
+  gather_facts: false
+
+  vars:
+    ansible_become: true
+    ansible_become_method: enable
+    ansible_command_timeout: 120
+
+  tasks:
+    - name: VLAN-Informationen auslesen
+      dellemc.os6.os6_command:
+        commands:
+          - show vlan
+      register: vlan_result
+
+    - name: VLAN-Datenstruktur initialisieren
+      ansible.builtin.set_fact:
+        switch_vlans: {}
+
+    - name: VLAN-ID und VLAN-Name erfassen
+      ansible.builtin.set_fact:
+        switch_vlans: >-
+          {{
+            switch_vlans
+            | combine({
+                (item[0:5] | trim): (item[7:40] | trim)
+              })
+          }}
+      loop: >-
+        {{
+          vlan_result.stdout_lines[0]
+          | select('match', '^[0-9]')
+          | list
+        }}
+      loop_control:
+        label: "VLAN {{ item[0:5] | trim }}"
+
+    - name: Gesamtliste aller VLAN-IDs initialisieren
+      ansible.builtin.set_fact:
+        all_vlan_ids: []
+      run_once: true
+
+    - name: VLAN-IDs aller Switches zusammenfuehren
+      ansible.builtin.set_fact:
+        all_vlan_ids: >-
+          {{
+            all_vlan_ids
+            | union(hostvars[item].switch_vlans.keys() | list)
+          }}
+      loop: "{{ groups['dell_switches'] }}"
+      loop_control:
+        label: "{{ item }}"
+      run_once: true
+
+    - name: Zusammenfassung anzeigen
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "Dell VLAN-Gesamtuebersicht"
+          - "Anzahl Switches: {{ groups['dell_switches'] | length }}"
+          - "Anzahl unterschiedlicher VLANs: {{ all_vlan_ids | length }}"
+          - "=============================================="
+      run_once: true
+
+    - name: VLANs mit Switch-Zuordnung anzeigen
+      ansible.builtin.debug:
+        msg: |-
+          {% set ns = namespace(present=[], missing=[], names=[]) %}
+          {% for switch in groups['dell_switches'] %}
+          {% if vlan_id in hostvars[switch].switch_vlans %}
+          {% set _ = ns.present.append(switch) %}
+          {% set vlan_name = hostvars[switch].switch_vlans[vlan_id] %}
+          {% if vlan_name not in ns.names %}
+          {% set _ = ns.names.append(vlan_name) %}
+          {% endif %}
+          {% else %}
+          {% set _ = ns.missing.append(switch) %}
+          {% endif %}
+          {% endfor %}
+          VLAN {{ vlan_id }}
+          Name: {{ ns.names | join(' / ') }}
+          Vorhanden auf:
+          {% for switch in ns.present %}
+            - {{ switch }}{% if hostvars[switch].ansible_host is defined %} ({{ hostvars[switch].ansible_host }}){% endif %}
+          {% endfor %}
+          {% if ns.missing | length > 0 %}
+          FEHLT AUF:
+          {% for switch in ns.missing %}
+            - {{ switch }}{% if hostvars[switch].ansible_host is defined %} ({{ hostvars[switch].ansible_host }}){% endif %}
+          {% endfor %}
+          {% else %}
+          Status: Auf allen Switches vorhanden
+          {% endif %}
+      loop: "{{ all_vlan_ids | map('int') | sort | map('string') | list }}"
+      loop_control:
+        loop_var: vlan_id
+        label: "VLAN {{ vlan_id }}"
+      run_once: true
