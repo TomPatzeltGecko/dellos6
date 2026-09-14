@@ -1,19 +1,39 @@
 ---
-- name: Dell VLAN Debug
+- name: Dell VLAN-Uebersicht
   hosts: dell_switches
   gather_facts: false
 
   vars:
     ansible_become: true
     ansible_become_method: enable
+    ansible_command_timeout: 120
 
   tasks:
-    - name: VLAN Informationen auslesen
+    - name: VLAN-Informationen auslesen
       dellemc.os6.os6_command:
         commands:
           - show vlan
       register: result
 
-    - name: Rohdaten anzeigen
-      debug:
-        var: result.stdout_lines[0]
+    - name: VLAN-Zeilen ermitteln
+      ansible.builtin.set_fact:
+        vlan_lines: >-
+          {{
+            result.stdout_lines[0]
+            | select('match', '^[0-9]')
+            | list
+          }}
+
+    - name: Switchinformationen anzeigen
+      ansible.builtin.debug:
+        msg:
+          - "Switch: {{ inventory_hostname }}"
+          - "IP-Adresse: {{ ansible_host | default(inventory_hostname) }}"
+          - "Anzahl VLANs: {{ vlan_lines | length }}"
+
+    - name: VLAN-Uebersicht anzeigen
+      ansible.builtin.debug:
+        msg: "{{ item }}"
+      loop: "{{ vlan_lines }}"
+      loop_control:
+        label: "VLAN {{ item.split()[0] }}"
