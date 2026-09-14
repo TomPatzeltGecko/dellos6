@@ -14,12 +14,12 @@
           - show vlan
       register: result
 
-    - name: VLANs extrahieren
+    - name: VLAN Übersicht
       ansible.builtin.debug:
         msg: "{{ inventory_hostname }} -> {{ item }}"
       loop: >-
         {{
           result.stdout[0].splitlines()
-          | select('match', '^[0-9]+\\s+')
+          | select('match', '^\\s*[0-9]+\\s+')
           | list
         }}
