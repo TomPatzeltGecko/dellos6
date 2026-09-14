@@ -1,0 +1,17 @@
+---
+- name: Dell Version Übersicht
+  hosts: dell_switches
+  gather_facts: false
+
+  tasks:
+    - name: Show Version
+      dellemc.os6.os6_command:
+        commands:
+          - show version
+      register: result
+
+    - name: Zusammenfassung
+      ansible.builtin.debug:
+        msg:
+          - "Switch: {{ inventory_hostname }}"
+          - "{{ result.stdout[0]
