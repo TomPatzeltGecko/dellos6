@@ -1,0 +1,15 @@
+---
+- name: Show Interface Status
+  hosts: cisco_switches
+  gather_facts: false
+
+  tasks:
+    - name: Show Interface Status
+      cisco.ios.ios_command:
+        commands:
+          - show interfaces status
+      register: result
+
+    - name: Ausgabe
+      debug:
+        var: result.stdout_lines
