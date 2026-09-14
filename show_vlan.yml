@@ -1,15 +1,18 @@
 ---
-- name: Show VLANs
-  hosts: cisco_switches
+- name: Dell VLANs anzeigen
+  hosts: dell_switches
   gather_facts: false
 
   tasks:
-    - name: Show VLAN Information
-      cisco.ios.ios_command:
+    - name: VLAN-Konfiguration auslesen
+      dellemc.os6.os6_command:
         commands:
-          - show vlan brief
+          - show vlan
       register: result
 
-    - name: Ausgabe
-      debug:
-        var: result.stdout_lines
+    - name: VLAN-Konfiguration ausgeben
+      ansible.builtin.debug:
+        msg:
+          - "Switch: {{ inventory_hostname }}"
+          - "IP-Adresse: {{ ansible_host | default(inventory_hostname) }}"
+          - "{{ result.stdout[0] }}"
