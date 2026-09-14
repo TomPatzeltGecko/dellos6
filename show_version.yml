@@ -5,10 +5,11 @@
 
   tasks:
     - name: Show Version
-      ansible.netcommon.cli_command:
-        command: show version
+      dellemc.os6.os6_command:
+        commands:
+          - show version
       register: result
 
     - name: Ausgabe
       ansible.builtin.debug:
-        msg: "{{ result.stdout }}"
+        msg: "{{ result.stdout[0] }}"
