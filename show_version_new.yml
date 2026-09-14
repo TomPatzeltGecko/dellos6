@@ -1,38 +1,97 @@
 ---
-- name: Dell Image-Versionen anzeigen
+- name: Dell Firmware-Versionen pruefen
   hosts: dell_switches
   gather_facts: false
 
   tasks:
-    - name: Show Version ausführen
+    - name: Show Version ausfuehren
       dellemc.os6.os6_command:
         commands:
           - show version
       register: result
 
-    - name: Firmware-Zeilen ermitteln
+    - name: Firmwareinformationen auslesen
       ansible.builtin.set_fact:
-        firmware_rows: >-
+        firmware_units: >-
           {{
-            result.stdout[0].splitlines()
-            | select('match', '^\s*[0-9]+\s+\S+\s+\S+\s+\S+\s+\S+\s*$')
-            | list
+            result.stdout[0]
+            | regex_findall(
+                '(?m)^\s*(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*$'
+              )
           }}
 
-    - name: Active und Backup Image je Unit anzeigen
+    - name: Firmwarestaende vorbereiten
+      ansible.builtin.set_fact:
+        active_images: "{{ firmware_units | map(attribute=1) | unique | list }}"
+        backup_images: "{{ firmware_units | map(attribute=2) | unique | list }}"
+        current_images: "{{ firmware_units | map(attribute=3) | unique | list }}"
+        next_images: "{{ firmware_units | map(attribute=4) | unique | list }}"
+      when: firmware_units | length > 0
+
+    - name: Einzelswitch anzeigen
       ansible.builtin.debug:
         msg:
           - "Switch: {{ inventory_hostname }}"
-          - "Unit: {{ item.split()[0] }}"
-          - "Active Image: {{ item.split()[1] }}"
-          - "Backup Image: {{ item.split()[2] }}"
-          - "Aktuell gestartet: {{ item.split()[3] }}"
-          - "Nach Neustart: {{ item.split()[4] }}"
-      loop: "{{ firmware_rows }}"
-      loop_control:
-        label: "Unit {{ item.split()[0] }}"
+          - "Typ: Einzelswitch"
+          - "Active Image: {{ firmware_units[0][1] }}"
+          - "Backup Image: {{ firmware_units[0][2] }}"
+          - "Aktuell gestartet: {{ firmware_units[0][3] }}"
+          - "Nach Neustart: {{ firmware_units[0][4] }}"
+      when: firmware_units | length == 1
 
-    - name: Hinweis bei nicht erkannter Firmware-Tabelle
+    - name: Stack mit einheitlichem Firmwarestand anzeigen
       ansible.builtin.debug:
-        msg: "Auf {{ inventory_hostname }} wurde keine passende Firmware-Tabelle gefunden."
-      when: firmware_rows | length == 0
+        msg:
+          - "Switch: {{ inventory_hostname }}"
+          - "Typ: Stack mit {{ firmware_units | length }} Units"
+          - "Status: Firmwarestand auf allen Units einheitlich"
+          - "Active Image: {{ active_images[0] }}"
+          - "Backup Image: {{ backup_images[0] }}"
+          - "Aktuell gestartet: {{ current_images[0] }}"
+          - "Nach Neustart: {{ next_images[0] }}"
+      when:
+        - firmware_units | length > 1
+        - active_images | length == 1
+        - backup_images | length == 1
+        - current_images | length == 1
+        - next_images | length == 1
+
+    - name: Warnung bei unterschiedlichen Stack-Versionen
+      ansible.builtin.debug:
+        msg:
+          - "ACHTUNG: Unterschiedliche Firmwarestaende im Stack erkannt!"
+          - "Switch: {{ inventory_hostname }}"
+          - "Anzahl Units: {{ firmware_units | length }}"
+          - "Details werden nachfolgend pro Unit ausgegeben."
+      when:
+        - firmware_units | length > 1
+        - active_images | length > 1 or
+          backup_images | length > 1 or
+          current_images | length > 1 or
+          next_images | length > 1
+
+    - name: Abweichende Stack-Units anzeigen
+      ansible.builtin.debug:
+        msg:
+          - "Unit: {{ item[0] }}"
+          - "Active Image: {{ item[1] }}"
+          - "Backup Image: {{ item[2] }}"
+          - "Aktuell gestartet: {{ item[3] }}"
+          - "Nach Neustart: {{ item[4] }}"
+      loop: "{{ firmware_units }}"
+      loop_control:
+        label: "Unit {{ item[0] }}"
+      when:
+        - firmware_units | length > 1
+        - active_images | length > 1 or
+          backup_images | length > 1 or
+          current_images | length > 1 or
+          next_images | length > 1
+
+    - name: Hinweis bei nicht erkannter Firmwaretabelle
+      ansible.builtin.debug:
+        msg:
+          - "Switch: {{ inventory_hostname }}"
+          - "Hinweis: Die Firmwaretabelle konnte nicht ausgewertet werden."
+          - "Bitte die Ausgabe von 'show version' kontrollieren."
+      when: firmware_units | length == 0
