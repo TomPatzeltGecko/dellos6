@@ -1,5 +1,5 @@
 ---
-- name: Dell Version Übersicht
+- name: Dell Image Versionen
   hosts: dell_switches
   gather_facts: false
 
@@ -10,8 +10,19 @@
           - show version
       register: result
 
-    - name: Zusammenfassung
+    - name: Versionszeile auslesen
+      ansible.builtin.set_fact:
+        image_versions: >-
+          {{
+            (
+              result.stdout[0]
+              | regex_search('(?m)^1\s+\S+\s+\S+')
+            ).split()
+          }}
+
+    - name: Active und Backup Image anzeigen
       ansible.builtin.debug:
         msg:
           - "Switch: {{ inventory_hostname }}"
-          - "{{ result.stdout[0]
+          - "Active Image: {{ image_versions[1] }}"
+          - "Backup Image: {{ image_versions[2] }}"
