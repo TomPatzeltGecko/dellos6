@@ -1,5 +1,5 @@
 ---
-- name: Dell VLAN-Uebersicht
+- name: Dell VLAN Übersicht
   hosts: dell_switches
   gather_facts: false
 
@@ -9,31 +9,30 @@
     ansible_command_timeout: 120
 
   tasks:
-    - name: VLAN-Informationen auslesen
+    - name: VLAN Informationen auslesen
       dellemc.os6.os6_command:
         commands:
           - show vlan
       register: result
 
-    - name: VLAN-Zeilen ermitteln
-      ansible.builtin.set_fact:
-        vlan_lines: >-
-          {{
-            result.stdout_lines[0]
-            | select('match', '^[0-9]')
-            | list
-          }}
-
-    - name: Switchinformationen anzeigen
+    - name: Header anzeigen
       ansible.builtin.debug:
         msg:
+          - "===================================="
           - "Switch: {{ inventory_hostname }}"
-          - "IP-Adresse: {{ ansible_host | default(inventory_hostname) }}"
-          - "Anzahl VLANs: {{ vlan_lines | length }}"
+          - "IP: {{ ansible_host }}"
+          - "===================================="
 
-    - name: VLAN-Uebersicht anzeigen
+    - name: VLAN Übersicht anzeigen
       ansible.builtin.debug:
-        msg: "{{ item }}"
-      loop: "{{ vlan_lines }}"
+        msg: >-
+          VLAN {{ '%-5s' | format(item.split()[0]) }}
+          {{ item.split()[1] }}
+      loop: >-
+        {{
+          result.stdout_lines[0]
+          | select('match', '^[0-9]')
+          | list
+        }}
       loop_control:
-        label: "VLAN {{ item.split()[0] }}"
+        label: "{{ item.split()[0] }}"
