@@ -3,6 +3,11 @@
   hosts: dell_switches
   gather_facts: false
 
+  vars:
+    ansible_become: true
+    ansible_become_method: enable
+    ansible_command_timeout: 120
+
   tasks:
     - name: VLAN-Konfiguration auslesen
       dellemc.os6.os6_command:
@@ -15,4 +20,5 @@
         msg:
           - "Switch: {{ inventory_hostname }}"
           - "IP-Adresse: {{ ansible_host | default(inventory_hostname) }}"
+          - "VLAN-Übersicht:"
           - "{{ result.stdout[0] }}"
