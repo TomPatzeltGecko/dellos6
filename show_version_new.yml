@@ -4,17 +4,27 @@
   gather_facts: false
 
   tasks:
-    - name: Show Version ausfuehren
+    - name: Hostname und Version auslesen
       dellemc.os6.os6_command:
         commands:
+          - show running-config | include hostname
           - show version
       register: result
+
+    - name: Switch-Hostname aufbereiten
+      ansible.builtin.set_fact:
+        switch_hostname: >-
+          {{
+            result.stdout[0]
+            | regex_replace('(?i)^hostname\s+', '')
+            | trim
+          }}
 
     - name: Firmwareinformationen auslesen
       ansible.builtin.set_fact:
         firmware_units: >-
           {{
-            result.stdout[0]
+            result.stdout[1]
             | regex_findall(
                 '(?m)^\s*(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*$'
               )
@@ -31,7 +41,8 @@
     - name: Einzelswitch anzeigen
       ansible.builtin.debug:
         msg:
-          - "Switch: {{ inventory_hostname }}"
+          - "Switch: {{ switch_hostname }}"
+          - "IP-Adresse: {{ ansible_host | default(inventory_hostname) }}"
           - "Typ: Einzelswitch"
           - "Active Image: {{ firmware_units[0][1] }}"
           - "Backup Image: {{ firmware_units[0][2] }}"
@@ -42,7 +53,8 @@
     - name: Stack mit einheitlichem Firmwarestand anzeigen
       ansible.builtin.debug:
         msg:
-          - "Switch: {{ inventory_hostname }}"
+          - "Switch: {{ switch_hostname }}"
+          - "IP-Adresse: {{ ansible_host | default(inventory_hostname) }}"
           - "Typ: Stack mit {{ firmware_units | length }} Units"
           - "Status: Firmwarestand auf allen Units einheitlich"
           - "Active Image: {{ active_images[0] }}"
@@ -60,19 +72,22 @@
       ansible.builtin.debug:
         msg:
           - "ACHTUNG: Unterschiedliche Firmwarestaende im Stack erkannt!"
-          - "Switch: {{ inventory_hostname }}"
+          - "Switch: {{ switch_hostname }}"
+          - "IP-Adresse: {{ ansible_host | default(inventory_hostname) }}"
           - "Anzahl Units: {{ firmware_units | length }}"
           - "Details werden nachfolgend pro Unit ausgegeben."
       when:
         - firmware_units | length > 1
-        - active_images | length > 1 or
+        - >-
+          active_images | length > 1 or
           backup_images | length > 1 or
           current_images | length > 1 or
           next_images | length > 1
 
-    - name: Abweichende Stack-Units anzeigen
+    - name: Stack-Units bei unterschiedlichen Versionen anzeigen
       ansible.builtin.debug:
         msg:
+          - "Switch: {{ switch_hostname }}"
           - "Unit: {{ item[0] }}"
           - "Active Image: {{ item[1] }}"
           - "Backup Image: {{ item[2] }}"
@@ -80,10 +95,11 @@
           - "Nach Neustart: {{ item[4] }}"
       loop: "{{ firmware_units }}"
       loop_control:
-        label: "Unit {{ item[0] }}"
+        label: "{{ switch_hostname }} - Unit {{ item[0] }}"
       when:
         - firmware_units | length > 1
-        - active_images | length > 1 or
+        - >-
+          active_images | length > 1 or
           backup_images | length > 1 or
           current_images | length > 1 or
           next_images | length > 1
@@ -91,7 +107,8 @@
     - name: Hinweis bei nicht erkannter Firmwaretabelle
       ansible.builtin.debug:
         msg:
-          - "Switch: {{ inventory_hostname }}"
+          - "Switch: {{ switch_hostname | default(inventory_hostname) }}"
+          - "IP-Adresse: {{ ansible_host | default(inventory_hostname) }}"
           - "Hinweis: Die Firmwaretabelle konnte nicht ausgewertet werden."
           - "Bitte die Ausgabe von 'show version' kontrollieren."
       when: firmware_units | length == 0
