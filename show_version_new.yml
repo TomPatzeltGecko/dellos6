@@ -10,9 +10,8 @@
           - show version
       register: result
 
-    - name: Active und Backup Image
-      debug:
-        msg:
-          - "Switch: {{ inventory_hostname }}"
-          - "Active: {{ result.stdout[0] | regex_search('(?m)^1\\s+(\\S+)', '\\1') }}"
-          - "Backup: {{ result.stdout[0] | regex_search('(?m)^1\\s+\\S+\\s+(\\S+)', '\\1') }}"
+    - name: Stack Images anzeigen
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} -> {{ item }}"
+      loop: "{{ result.stdout[0].split('\n') }}"
+      when: item is match('^[0-9]+\\s+')
