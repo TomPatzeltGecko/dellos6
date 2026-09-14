@@ -9,7 +9,7 @@
     ansible_command_timeout: 120
 
   tasks:
-    - name: VLAN-Informationen von den Switches auslesen
+    - name: VLAN-Informationen auslesen
       dellemc.os6.os6_command:
         commands:
           - show vlan
@@ -51,94 +51,87 @@
           }}
       run_once: true
 
-    - name: VLAN-Gesamtuebersicht anzeigen
+    - name: Kompakte VLAN-Uebersicht anzeigen
       ansible.builtin.debug:
         msg: |-
           ============================================================
-          DELL VLAN-GESAMTUEBERSICHT
+          DELL VLAN-ÜBERSICHT
           ============================================================
-          Ausgewertete Switches: {{ groups['dell_switches'] | length }}
-          Gefundene VLAN-IDs:    {{ all_vlan_ids | length }}
+          Switches: {{ groups['dell_switches'] | length }}
+          VLANs:    {{ all_vlan_ids | length }}
 
-          {% for vlan_number in all_vlan_ids %}
-          {% set vlan_id = vlan_number | string %}
-          {% set ns = namespace(present=[], missing=[], names=[]) %}
-
-          {% for switch in groups['dell_switches'] %}
-          {% if vlan_id in hostvars[switch].switch_vlans %}
-          {% set _ = ns.present.append(switch) %}
-          {% set vlan_name = hostvars[switch].switch_vlans[vlan_id] %}
-          {% if vlan_name not in ns.names %}
-          {% set _ = ns.names.append(vlan_name) %}
-          {% endif %}
-          {% else %}
-          {% set _ = ns.missing.append(switch) %}
-          {% endif %}
-          {% endfor %}
-
+          VLAN-ID | VLAN-Name | Switches
           ------------------------------------------------------------
-          VLAN {{ vlan_id }} | {{ ns.names | join(' / ') }}
-          ------------------------------------------------------------
-          Vorhanden auf {{ ns.present | length }} von {{ groups['dell_switches'] | length }} Switches:
-          {% for switch in ns.present %}
-            + {{ switch }}{% if hostvars[switch].ansible_host is defined %} ({{ hostvars[switch].ansible_host }}){% endif %}
-          {% endfor %}
-          {% if ns.missing | length > 0 %}
-          Fehlt auf:
-          {% for switch in ns.missing %}
-            - {{ switch }}{% if hostvars[switch].ansible_host is defined %} ({{ hostvars[switch].ansible_host }}){% endif %}
-          {% endfor %}
-          {% else %}
-          Status: Auf allen Switches vorhanden
-          {% endif %}
-
-          {% endfor %}
+          {%- for vlan_number in all_vlan_ids %}
+          {%- set vlan_id = vlan_number | string %}
+          {%- set ns = namespace(present=[], names=[]) %}
+          {%- for switch in groups['dell_switches'] %}
+          {%- if vlan_id in hostvars[switch].switch_vlans %}
+          {%- set _ = ns.present.append(switch) %}
+          {%- set vlan_name = hostvars[switch].switch_vlans[vlan_id] %}
+          {%- if vlan_name not in ns.names %}
+          {%- set _ = ns.names.append(vlan_name) %}
+          {%- endif %}
+          {%- endif %}
+          {%- endfor %}
+          {{ "\n" }}VLAN {{ "%-4s" | format(vlan_id) }} | {{ ns.names | join(" / ") }} | {{ ns.present | length }}/{{ groups['dell_switches'] | length }}
+          {%- endfor %}
       run_once: true
 
-    - name: Zusammenfassung der Abweichungen anzeigen
+    - name: Fehlende VLANs kompakt anzeigen
       ansible.builtin.debug:
         msg: |-
           ============================================================
-          VLAN-ABWEICHUNGEN
+          VLANs, DIE NICHT AUF ALLEN SWITCHES VORHANDEN SIND
           ============================================================
-          {% set report = namespace(missing_count=0, name_count=0) %}
+          {%- set report = namespace(count=0) %}
+          {%- for vlan_number in all_vlan_ids %}
+          {%- set vlan_id = vlan_number | string %}
+          {%- set ns = namespace(present=[], missing=[], names=[]) %}
+          {%- for switch in groups['dell_switches'] %}
+          {%- if vlan_id in hostvars[switch].switch_vlans %}
+          {%- set _ = ns.present.append(switch) %}
+          {%- set vlan_name = hostvars[switch].switch_vlans[vlan_id] %}
+          {%- if vlan_name not in ns.names %}
+          {%- set _ = ns.names.append(vlan_name) %}
+          {%- endif %}
+          {%- else %}
+          {%- set _ = ns.missing.append(switch) %}
+          {%- endif %}
+          {%- endfor %}
+          {%- if ns.missing | length > 0 %}
+          {%- set report.count = report.count + 1 %}
+          {{ "\n" }}VLAN {{ "%-4s" | format(vlan_id) }} | {{ ns.names | join(" / ") }}
+            Fehlt auf: {{ ns.missing | join(", ") }}
+          {%- endif %}
+          {%- endfor %}
 
-          {% for vlan_number in all_vlan_ids %}
-          {% set vlan_id = vlan_number | string %}
-          {% set ns = namespace(present=[], missing=[], names=[]) %}
+          {{ "\n" }}Anzahl betroffener VLANs: {{ report.count }}
+      run_once: true
 
-          {% for switch in groups['dell_switches'] %}
-          {% if vlan_id in hostvars[switch].switch_vlans %}
-          {% set _ = ns.present.append(switch) %}
-          {% set vlan_name = hostvars[switch].switch_vlans[vlan_id] %}
-          {% if vlan_name not in ns.names %}
-          {% set _ = ns.names.append(vlan_name) %}
-          {% endif %}
-          {% else %}
-          {% set _ = ns.missing.append(switch) %}
-          {% endif %}
-          {% endfor %}
+    - name: VLAN-Namensabweichungen kompakt anzeigen
+      ansible.builtin.debug:
+        msg: |-
+          ============================================================
+          UNTERSCHIEDLICHE VLAN-NAMEN
+          ============================================================
+          {%- set report = namespace(count=0) %}
+          {%- for vlan_number in all_vlan_ids %}
+          {%- set vlan_id = vlan_number | string %}
+          {%- set ns = namespace(names=[]) %}
+          {%- for switch in groups['dell_switches'] %}
+          {%- if vlan_id in hostvars[switch].switch_vlans %}
+          {%- set vlan_name = hostvars[switch].switch_vlans[vlan_id] %}
+          {%- if vlan_name not in ns.names %}
+          {%- set _ = ns.names.append(vlan_name) %}
+          {%- endif %}
+          {%- endif %}
+          {%- endfor %}
+          {%- if ns.names | length > 1 %}
+          {%- set report.count = report.count + 1 %}
+          {{ "\n" }}VLAN {{ "%-4s" | format(vlan_id) }} | {{ ns.names | join(" / ") }}
+          {%- endif %}
+          {%- endfor %}
 
-          {% if ns.missing | length > 0 %}
-          {% set report.missing_count = report.missing_count + 1 %}
-          VLAN {{ vlan_id }} | {{ ns.names | join(' / ') }}
-            Fehlt auf: {{ ns.missing | join(', ') }}
-          {% endif %}
-
-          {% if ns.names | length > 1 %}
-          {% set report.name_count = report.name_count + 1 %}
-          VLAN {{ vlan_id }} hat unterschiedliche Namen:
-          {% for switch in ns.present %}
-            {{ switch }}: {{ hostvars[switch].switch_vlans[vlan_id] }}
-          {% endfor %}
-          {% endif %}
-
-          {% endfor %}
-
-          VLANs, die nicht überall vorhanden sind: {{ report.missing_count }}
-          VLANs mit unterschiedlichen Namen:       {{ report.name_count }}
-
-          {% if report.missing_count == 0 and report.name_count == 0 %}
-          Status: Keine VLAN-Abweichungen erkannt.
-          {% endif %}
+          {{ "\n" }}Anzahl Namensabweichungen: {{ report.count }}
       run_once: true
