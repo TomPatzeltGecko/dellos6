@@ -10,13 +10,10 @@
           - show version
       register: result
 
-    - name: Zeilen mit Software-Versionen anzeigen
-      ansible.builtin.debug:
-        msg: "{{ item }}"
-      loop: >-
-        {{
-          result.stdout[0].split('\n')
-          | select('match', '^[0-9]+\\s+')
-          | list
-        }}
+    - name: Active und Backup Image
+      debug:
+        msg:
+          - "Switch: {{ inventory_hostname }}"
+          - "Active: {{ result.stdout[0] | regex_search('(?m)^1\\s+(\\S+)', '\\1') }}"
+          - "Backup: {{ result.stdout[0] | regex_search('(?m)^1\\s+\\S+\\s+(\\S+)', '\\1') }}"
 ``
